@@ -1,7 +1,10 @@
 package main
 
-import "fmt"
+import (
+    "github.com/IsaacEscobar09/MusicDataBase/src/view"
+)
 
 func main() {
-    fmt.Println("Hello World!")
+    view.NewMusicView()
 }
+
