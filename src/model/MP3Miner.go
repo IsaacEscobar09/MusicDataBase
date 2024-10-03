@@ -6,21 +6,29 @@ import (
     "os"
     "path/filepath"
     "time"
-
+    "database/sql"
+    _ "github.com/mattn/go-sqlite3"
     "github.com/dhowden/tag"
 )
 
-// Método principal para minar un directorio
-func MineDirectory(path string) {
-    // Recorre el directorio y busca archivos .mp3
-    err := filepath.Walk(path, func(filePath string, info os.FileInfo, err error) error {
+type MP3Miner struct {
+}
+
+func (m *MP3Miner) MineDirectory(path string, dbPath string) {
+    // Abrir o crear la base de datos
+    db, err := sql.Open("sqlite3", dbPath)
+    if err != nil {
+        log.Fatalf("Error al abrir la base de datos: %v\n", err)
+    }
+    defer db.Close()
+
+    err = filepath.Walk(path, func(filePath string, info os.FileInfo, err error) error {
         if err != nil {
             return err
         }
-        // Si el archivo tiene la extensión .mp3
         if filepath.Ext(filePath) == ".mp3" {
             fmt.Printf("Analizando archivo: %s\n", filePath)
-            ExtractMetadata(filePath)
+            ExtractMetadata(filePath, db)
         }
         return nil
     })
@@ -30,8 +38,7 @@ func MineDirectory(path string) {
     }
 }
 
-// Método para extraer las etiquetas de un archivo MP3
-func ExtractMetadata(filePath string) {
+func ExtractMetadata(filePath string, db *sql.DB) {
     file, err := os.Open(filePath)
     if err != nil {
         log.Printf("Error al abrir el archivo: %s\n", err)
@@ -39,17 +46,14 @@ func ExtractMetadata(filePath string) {
     }
     defer file.Close()
 
-    // Usando la biblioteca tag para obtener los metadatos
     metadata, err := tag.ReadFrom(file)
     if err != nil {
         log.Printf("Error al leer los metadatos: %s\n", err)
         return
     }
 
-    // Obtener el año actual o de creación del archivo
     currentYear := time.Now().Year()
 
-    // Imprimir etiquetas con valores por omisión
     title := metadata.Title()
     if title == "" {
         title = "Unknown"
@@ -62,7 +66,7 @@ func ExtractMetadata(filePath string) {
 
     album := metadata.Album()
     if album == "" {
-        album = "Unknown"
+        album = filepath.Base(filepath.Dir(filePath)) 
     }
 
     year := metadata.Year()
@@ -75,16 +79,51 @@ func ExtractMetadata(filePath string) {
         genre = "Unknown"
     }
 
-    trackNum, totalTracks := metadata.Track()
+    trackNum, _ := metadata.Track()
     if trackNum == 0 {
-        trackNum = 1 // Valor por omisión si no hay número de pista
+        trackNum = 1 
     }
 
-    // Imprimir las etiquetas obtenidas
-    fmt.Printf("Título: %s\n", title)
-    fmt.Printf("Artista: %s\n", artist)
-    fmt.Printf("Álbum: %s\n", album)
-    fmt.Printf("Año: %d\n", year)
-    fmt.Printf("Género: %s\n", genre)
-    fmt.Printf("Pista: %d/%d\n", trackNum, totalTracks)
+    insertAlbum(db, album, year, filepath.Dir(filePath))
+
+    insertPerformer(db, artist)
+
+    insertRola(db, artist, album, filePath, title, trackNum, year, genre)
+}
+
+func insertAlbum(db *sql.DB, name string, year int, path string) {
+    _, err := db.Exec("INSERT OR IGNORE INTO albums (name, year, path) VALUES (?, ?, ?)", name, year, path)
+    if err != nil {
+        log.Printf("Error al insertar el álbum: %v\n", err)
+    }
+}
+
+func insertPerformer(db *sql.DB, name string) {
+    _, err := db.Exec("INSERT OR IGNORE INTO performers (name, id_type) VALUES (?, ?)", name, 2)
+    if err != nil {
+        log.Printf("Error al insertar el intérprete: %v\n", err)
+    }
+}
+
+func insertRola(db *sql.DB, artist, album, filePath, title string, trackNum, year int, genre string) {
+    var id_performer int
+    var id_album int
+
+    err := db.QueryRow("SELECT id_performer FROM performers WHERE name = ?", artist).Scan(&id_performer)
+    if err != nil {
+        log.Printf("Error al obtener el ID del intérprete: %v\n", err)
+        return
+    }
+
+    err = db.QueryRow("SELECT id_album FROM albums WHERE name = ?", album).Scan(&id_album)
+    if err != nil {
+        log.Printf("Error al obtener el ID del álbum: %v\n", err)
+        return
+    }
+
+    _, err = db.Exec("INSERT INTO rolas (id_performer, id_album, path, title, track, year, genre) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        id_performer, id_album, filePath, title, trackNum, year, genre)
+    if err != nil {
+        log.Printf("Error al insertar la rola: %v\n", err)
+    }
 }

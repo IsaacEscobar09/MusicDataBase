@@ -6,9 +6,19 @@ import (
     "log"
     _ "github.com/mattn/go-sqlite3"
     "os"
+    "path/filepath"
 )
 
 func InitializeDatabase(dbPath string) {
+    configDir := filepath.Dir(dbPath)
+    if _, err := os.Stat(configDir); os.IsNotExist(err) {
+        err := os.MkdirAll(configDir, os.ModePerm)
+        if err != nil {
+            log.Fatalf("Error al crear el directorio de configuración: %s\n", err)
+        }
+        fmt.Printf("Directorio creado en: %s\n", configDir)
+    }
+
     if _, err := os.Stat(dbPath); os.IsNotExist(err) {
         fmt.Printf("El archivo no existe, se creará una nueva base de datos en: %s\n", dbPath)
     }
