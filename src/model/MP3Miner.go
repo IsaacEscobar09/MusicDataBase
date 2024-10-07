@@ -14,8 +14,31 @@ import (
 type MP3Miner struct {
 }
 
-func (m *MP3Miner) MineDirectory(path string, dbPath string) {
-    // Abrir o crear la base de datos
+func findDatabaseFile(dbDir string) (string, error) {
+    var dbFile string
+    err := filepath.Walk(dbDir, func(path string, info os.FileInfo, err error) error {
+        if err != nil {
+            return err
+        }
+        if !info.IsDir() && filepath.Ext(path) == ".db" {
+            dbFile = path
+            return filepath.SkipDir         }
+        return nil
+    })
+
+    if dbFile == "" {
+        return "", fmt.Errorf("no se encontró un archivo de base de datos en %s", dbDir)
+    }
+
+    return dbFile, err
+}
+
+func (m *MP3Miner) MineDirectory(path string, dbDir string) {
+    dbPath, err := findDatabaseFile(dbDir)
+    if err != nil {
+        log.Fatalf("Error al encontrar el archivo de base de datos: %v\n", err)
+    }
+
     db, err := sql.Open("sqlite3", dbPath)
     if err != nil {
         log.Fatalf("Error al abrir la base de datos: %v\n", err)
@@ -84,11 +107,25 @@ func ExtractMetadata(filePath string, db *sql.DB) {
         trackNum = 1 
     }
 
+    if songExists(db, filePath) {
+        fmt.Printf("La canción ya existe en la base de datos, omitiendo: %s\n", filePath)
+        return
+    }
+
     insertAlbum(db, album, year, filepath.Dir(filePath))
-
     insertPerformer(db, artist)
-
     insertRola(db, artist, album, filePath, title, trackNum, year, genre)
+}
+
+func songExists(db *sql.DB, filePath string) bool {
+    var exists bool
+    query := `SELECT EXISTS(SELECT 1 FROM rolas WHERE path = ? LIMIT 1);`
+    err := db.QueryRow(query, filePath).Scan(&exists)
+    if err != nil {
+        log.Printf("Error al verificar si la canción existe: %v\n", err)
+        return false
+    }
+    return exists
 }
 
 func insertAlbum(db *sql.DB, name string, year int, path string) {

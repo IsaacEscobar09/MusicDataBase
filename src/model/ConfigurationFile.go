@@ -21,12 +21,13 @@ func NewConfigurationFile() *ConfigurationFile {
         return nil
     }
 
-    // Ruta a .config en el directorio del usuario
     configDir := filepath.Join(usr.HomeDir, ".config", "MusicDataBase")
-configFilePath := filepath.Join(configDir, "MusicConfig.conf")
-    defaultDBPath := filepath.Join(configDir, "MusicDataBase.sqlite")
+    configFilePath := filepath.Join(configDir, "MusicConfig.conf")
+    
+    // Cambiar la ruta de la base de datos a $HOME/.local/share/DataBase
+    dbDir := filepath.Join(usr.HomeDir, ".local", "share", "DataBase")
+    defaultDBPath := filepath.Join(dbDir, "MusicDataBase.db")
 
-    // Determinar si usar 'Música' o 'Music' según el idioma
     musicDir := filepath.Join(usr.HomeDir, "Música")
     if _, err := os.Stat(musicDir); os.IsNotExist(err) {
         musicDir = filepath.Join(usr.HomeDir, "Music")
@@ -59,7 +60,7 @@ func (cf *ConfigurationFile) CreateDefaultConfig() error {
     }
     defer file.Close()
 
-    // Escribir las rutas por defecto
+    // Escribir las rutas por defecto (nueva ruta para la base de datos)
     if _, err := file.WriteString(fmt.Sprintf("DB_PATH=%s\nMUSIC_DIR=%s\n", cf.DefaultDBPath, cf.DefaultMusicDir)); err != nil {
         return fmt.Errorf("error escribiendo en el archivo de configuración: %v", err)
     }
