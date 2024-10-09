@@ -63,12 +63,19 @@ func NewMusicView() {
     // Obtener contenedores de canciones y agregarlos a la vista
     songContainers := mc.CreateSongContainers()
 
-    // Definir contenido principal de la ventana
-    myWindow.SetContent(container.NewVBox(
-        buttonsContainer,
-        container.NewMax(searchEntry),
-        minerButton,
-        container.NewVBox(songContainers...), // Agregar contenedores de canciones
+    // Crear un contenedor desplazable con las canciones
+    scrollableSongs := container.NewVScroll(
+        container.NewVBox(songContainers...),
+    )
+    scrollableSongs.SetMinSize(fyne.NewSize(800, 400)) // Define el tamaño mínimo del área desplazable
+
+    // Definir el contenido principal, usando un spacer para empujar la lista de canciones
+    myWindow.SetContent(container.NewBorder(
+        container.NewVBox(buttonsContainer, searchEntry, minerButton), // Parte superior
+        nil,    // Parte inferior vacía
+        nil,    // Izquierda vacía
+        nil,    // Derecha vacía
+        scrollableSongs,  // Centro: lista de canciones que ocupa el resto de la pantalla
     ))
 
     myWindow.Resize(fyne.NewSize(800, 600))
