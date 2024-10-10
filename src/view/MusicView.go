@@ -47,8 +47,13 @@ func NewMusicView() {
     settingsButton := widget.NewButton("Settings", func() {
         mc.ShowSettingsDialog(myWindow)
     })
+
+    // Barra de progreso
+    progressBar := widget.NewProgressBar()
+
+    // Botón para iniciar minería con barra de progreso
     minerButton := widget.NewButton("Miner", func() {
-        mc.StartMining(myWindow)
+        mc.StartMiningWithProgress(myWindow, progressBar)
     })
 
     buttonsContainer := container.NewHBox(
@@ -60,6 +65,7 @@ func NewMusicView() {
         closeButton,
     )
 
+    
     // Obtener contenedores de canciones y agregarlos a la vista
     songContainers := mc.CreateSongContainers()
 
@@ -67,11 +73,12 @@ func NewMusicView() {
     scrollableSongs := container.NewVScroll(
         container.NewVBox(songContainers...),
     )
+
     scrollableSongs.SetMinSize(fyne.NewSize(800, 400)) // Define el tamaño mínimo del área desplazable
 
     // Definir el contenido principal, usando un spacer para empujar la lista de canciones
     myWindow.SetContent(container.NewBorder(
-        container.NewVBox(buttonsContainer, searchEntry, minerButton), // Parte superior
+        container.NewVBox(buttonsContainer, searchEntry, progressBar, minerButton), // Parte superior
         nil,    // Parte inferior vacía
         nil,    // Izquierda vacía
         nil,    // Derecha vacía

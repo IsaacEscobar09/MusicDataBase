@@ -9,7 +9,7 @@ import (
     "fyne.io/fyne/v2/dialog"
     "fyne.io/fyne/v2/container"
     "fyne.io/fyne/v2/widget"
-    _ "github.com/mattn/go-sqlite3" // Importa el driver de SQLite
+    _ "github.com/mattn/go-sqlite3" 
     "github.com/IsaacEscobar09/MusicDataBase/src/model"
 )
 
@@ -17,7 +17,7 @@ type MusicController struct {
     ConfigFile    *model.ConfigurationFile
     MP3Miner      *model.MP3Miner
     MusicDatabase *model.MusicDataBase
-    DB            *sql.DB // Conexión a la base de datos
+    DB            *sql.DB 
 }
 
 // Constructor de MusicController
@@ -26,7 +26,7 @@ func NewMusicController() *MusicController {
     mp3Miner := &model.MP3Miner{}
     musicDatabase := model.NewMusicDataBase(configFile.DefaultDBPath)
 
-    // Abrir conexión a la base de datos
+    
     db, err := sql.Open("sqlite3", configFile.DefaultDBPath)
     if err != nil {
         panic(fmt.Sprintf("Error al abrir la base de datos: %v", err))
@@ -36,35 +36,9 @@ func NewMusicController() *MusicController {
         ConfigFile:    configFile,
         MP3Miner:      mp3Miner,
         MusicDatabase: musicDatabase,
-        DB:            db, // Asignar la conexión a la estructura
+        DB:            db, 
     }
 }
-
-// Crear contenedores para cada canción en la base de datos
-func (mc *MusicController) CreateSongContainers() []fyne.CanvasObject {
-    songs, err := mc.GetAllSongs()
-    if err != nil {
-        return []fyne.CanvasObject{widget.NewLabel("Error al obtener canciones")}
-    }
-
-    songContainers := []fyne.CanvasObject{}
-    for _, song := range songs {
-        songContainer := mc.createSongContainer(song)
-        songContainers = append(songContainers, songContainer)
-    }
-    return songContainers
-}
-
-// Función privada para crear un contenedor de canción
-func (mc *MusicController) createSongContainer(song Song) *fyne.Container {
-    songInfo := widget.NewLabel(fmt.Sprintf("Canción: %s | Artista: %s | Álbum: %s | Año: %d | Género: %s | No. de pista: %d",
-        song.Title, song.Artist, song.Album, song.Year, song.Genre, song.Track))
-
-    // Crear un borde alrededor de la información de la canción
-    container := container.NewVBox(songInfo)
-    return container
-}
-
 
 // Definición de la estructura Song dentro de MusicController.go
 type Song struct {
@@ -102,6 +76,40 @@ func (mc *MusicController) GetAllSongs() ([]Song, error) {
     return songs, nil
 }
 
+// Crear contenedores para cada canción en la base de datos
+func (mc *MusicController) CreateSongContainers() []fyne.CanvasObject {
+    songs, err := mc.GetAllSongs()
+    if err != nil {
+        return []fyne.CanvasObject{widget.NewLabel("Error al obtener canciones")}
+    }
+
+    songContainers := []fyne.CanvasObject{}
+    for _, song := range songs {
+        songContainer := mc.createSongContainer(song)
+        songContainers = append(songContainers, songContainer)
+    }
+    return songContainers
+}
+
+// Función privada para crear un contenedor de canción
+func (mc *MusicController) createSongContainer(song Song) *fyne.Container {
+    songInfo := widget.NewLabel(fmt.Sprintf("Canción: %s | Artista: %s | Álbum: %s | Año: %d | Género: %s | No. de pista: %d",
+        song.Title, song.Artist, song.Album, song.Year, song.Genre, song.Track))
+
+    container := container.NewVBox(songInfo)
+    return container
+}
+
+// Iniciar minería de música en una gorutina
+func (mc *MusicController) StartMiningWithProgress(parent fyne.Window, progressBar *widget.ProgressBar) {
+    go func() {
+        totalFiles := mc.MP3Miner.GetTotalFiles(mc.ConfigFile.DefaultMusicDir)  
+        mc.MP3Miner.MineDirectoryWithProgress(mc.ConfigFile.DefaultMusicDir, mc.ConfigFile.DefaultDBPath, progressBar, totalFiles)
+        dialog.ShowInformation("Miner", "Minería completada.", parent)
+    }()
+}
+
+
 // Verificar y crear configuración y base de datos si es necesario
 func (mc *MusicController) CheckConfigAndDB() error {
     if err := mc.MusicDatabase.InitializeDatabase(); err != nil {
@@ -113,12 +121,6 @@ func (mc *MusicController) CheckConfigAndDB() error {
     }
 
     return nil
-}
-
-// Iniciar minería de música
-func (mc *MusicController) StartMining(parent fyne.Window) {
-    mc.MP3Miner.MineDirectory(mc.ConfigFile.DefaultMusicDir, mc.ConfigFile.DefaultDBPath)
-    dialog.ShowInformation("Miner", "Minería iniciada.", parent)
 }
 
 // Mostrar diálogo de configuración
@@ -157,3 +159,4 @@ func (mc *MusicController) UpdateDatabasePath(newDBPath string) {
 func (mc *MusicController) OpenHelp() {
     exec.Command("xdg-open", "https://github.com/IsaacEscobar09/MusicDataBase").Start()
 }
+

@@ -9,9 +9,11 @@ import (
     "database/sql"
     _ "github.com/mattn/go-sqlite3"
     "github.com/dhowden/tag"
+"fyne.io/fyne/v2/widget"
 )
 
 type MP3Miner struct {
+    FileCount int
 }
 
 func findDatabaseFile(dbDir string) (string, error) {
@@ -33,7 +35,18 @@ func findDatabaseFile(dbDir string) (string, error) {
     return dbFile, err
 }
 
-func (m *MP3Miner) MineDirectory(path string, dbDir string) {
+func (m *MP3Miner) GetTotalFiles(path string) int {
+    fileCount := 0
+    filepath.Walk(path, func(filePath string, info os.FileInfo, err error) error {
+        if err == nil && filepath.Ext(filePath) == ".mp3" {
+            fileCount++
+        }
+        return nil
+    })
+    return fileCount
+}
+
+func (m *MP3Miner) MineDirectoryWithProgress(path string, dbDir string, progressBar *widget.ProgressBar, totalFiles int) {
     dbPath, err := findDatabaseFile(dbDir)
     if err != nil {
         log.Fatalf("Error al encontrar el archivo de base de datos: %v\n", err)
@@ -45,6 +58,7 @@ func (m *MP3Miner) MineDirectory(path string, dbDir string) {
     }
     defer db.Close()
 
+    currentFile := 0
     err = filepath.Walk(path, func(filePath string, info os.FileInfo, err error) error {
         if err != nil {
             return err
@@ -52,6 +66,10 @@ func (m *MP3Miner) MineDirectory(path string, dbDir string) {
         if filepath.Ext(filePath) == ".mp3" {
             fmt.Printf("Analizando archivo: %s\n", filePath)
             ExtractMetadata(filePath, db)
+
+            // Actualizar barra de progreso y lista de canciones
+            currentFile++
+            progressBar.SetValue(float64(currentFile) / float64(totalFiles)) // Actualiza progreso
         }
         return nil
     })
@@ -60,6 +78,7 @@ func (m *MP3Miner) MineDirectory(path string, dbDir string) {
         log.Fatalf("Error al recorrer el directorio: %v\n", err)
     }
 }
+
 
 func ExtractMetadata(filePath string, db *sql.DB) {
     file, err := os.Open(filePath)
