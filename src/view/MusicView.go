@@ -10,10 +10,6 @@ import (
     "github.com/IsaacEscobar09/MusicDataBase/src/controller"
 )
 
-type MusicView struct {
-    controller *controller.MusicController
-}
-
 func NewMusicView() {
     myApp := app.New()
     myWindow := myApp.NewWindow("Music Data Base")
@@ -27,9 +23,24 @@ func NewMusicView() {
         return
     }
 
+    // Barra de progreso
+    progressBar := widget.NewProgressBar()
+
+    // Crear el contenedor desplazable para las canciones
+    scrollableSongs := container.NewVScroll(container.NewVBox()) // Inicializar el contenedor de canciones vacío
+    scrollableSongs.SetMinSize(fyne.NewSize(800, 400)) // Define el tamaño mínimo del área desplazable
+
     // Componentes de la UI
     searchEntry := widget.NewEntry()
     searchEntry.SetPlaceHolder("Buscar canción")
+
+    // Función para realizar la búsqueda y actualizar la lista
+    performSearch := func() {
+        searchString := searchEntry.Text // Capturamos el texto ingresado por el usuario
+        songContainers := mc.CreateSearchResultsContainers(searchString) // Llamamos al método de búsqueda
+        scrollableSongs.Content = container.NewVBox(songContainers...) // Actualizamos el contenido
+        scrollableSongs.Refresh() // Refrescamos la vista para mostrar los nuevos resultados
+    }
 
     // Botones de la UI
     minimizeButton := widget.NewButton("−", func() {
@@ -48,33 +59,41 @@ func NewMusicView() {
         mc.ShowSettingsDialog(myWindow)
     })
 
-    // Barra de progreso
-    progressBar := widget.NewProgressBar()
-
-    // Botón para iniciar minería con barra de progreso
-    minerButton := widget.NewButton("Miner", func() {
-        mc.StartMiningWithProgress(myWindow, progressBar)
+    // Botón "Inicio" para restablecer la vista de todas las canciones
+    homeButton := widget.NewButton("Inicio", func() {
+        songContainers := mc.CreateSongContainers()
+        scrollableSongs.Content = container.NewVBox(songContainers...)
+        scrollableSongs.Refresh()
     })
+
+    // Inicialmente cargar todas las canciones de la base de datos
+    songContainers := mc.CreateSongContainers()
+    scrollableSongs.Content = container.NewVBox(songContainers...)
 
     buttonsContainer := container.NewHBox(
         helpButton,
         settingsButton,
+        homeButton, // Agregamos el botón "Inicio" al contenedor de botones
         layout.NewSpacer(),
         minimizeButton,
         fullscreenButton,
         closeButton,
     )
 
-    
-    // Obtener contenedores de canciones y agregarlos a la vista
-    songContainers := mc.CreateSongContainers()
+    // Botón para iniciar minería con barra de progreso
+    minerButton := widget.NewButton("Miner", func() {
+        // Llamar a la minería con barra de progreso y callback para refrescar las canciones
+        mc.StartMiningWithProgress(myWindow, progressBar, func() {
+            songContainers := mc.CreateSongContainers()
+            scrollableSongs.Content = container.NewVBox(songContainers...)
+            scrollableSongs.Refresh()
+        })
+    })
 
-    // Crear un contenedor desplazable con las canciones
-    scrollableSongs := container.NewVScroll(
-        container.NewVBox(songContainers...),
-    )
-
-    scrollableSongs.SetMinSize(fyne.NewSize(800, 400)) // Define el tamaño mínimo del área desplazable
+    // Acción al presionar la tecla "Enter" en la barra de búsqueda
+    searchEntry.OnSubmitted = func(text string) {
+        performSearch() // Ejecuta la búsqueda cuando el usuario presiona Enter
+    }
 
     // Definir el contenido principal, usando un spacer para empujar la lista de canciones
     myWindow.SetContent(container.NewBorder(
