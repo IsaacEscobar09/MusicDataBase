@@ -19,8 +19,9 @@ Ademas necesitara tener instalado `sqlite3`
 O bien crear el ejecutable con el comando:  
 `$ go build -o <NombreDelEjecutable> src/main.go`  
 y para correrlo usar lo siguiente:  
-`$ ./<NombreDelEjecutable>`  
-4. Disfrutar el programa.
+`$ ./<NombreDelEjecutable>`
+4. La primera vez que ejecutes el programa, la interfaz puede que llegue a tardar en aparecer o mostrarse ante el usuario pero tarde o temprano se mostrara, solo es la primera vez, ya después al ejecutarlo por segunda vez y en adelante, esta se mostrara rapido.  
+5. Disfrutar el programa.
 
 ### Funciones de la Interfaz
 La interfaz cuenta con los siguientes botones:
