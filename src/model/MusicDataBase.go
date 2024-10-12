@@ -10,27 +10,30 @@ import (
     "path/filepath"
 )
 
+// MusicDataBase es una estructura que maneja la base de datos de la aplicación.
 type MusicDataBase struct {
-    dbPath string
+    dbPath string // Ruta donde se encuentra la base de datos SQLite
 }
 
-// NewMusicDataBase es el constructor para MusicDataBase
+// NewMusicDataBase es el constructor que inicializa una nueva instancia de MusicDataBase.
 func NewMusicDataBase(dbPath string) *MusicDataBase {
     return &MusicDataBase{dbPath: dbPath}
 }
 
-// InitializeDatabase inicializa la base de datos en la ruta especificada
+// InitializeDatabase se encarga de inicializar la base de datos, creando el directorio
+// y el archivo si no existen, y verificando si el esquema está completo.
 func (mdb *MusicDataBase) InitializeDatabase() error {
-    usr, err := user.Current() // Obtener el usuario actual para el directorio $HOME
+    // Obtener el directorio home del usuario actual
+    usr, err := user.Current()
     if err != nil {
         return fmt.Errorf("error obteniendo el usuario actual: %s", err)
     }
 
-    // Cambiar el directorio de la base de datos a $HOME/.local/share/DataBase
+    // Definir la ruta para la base de datos dentro de $HOME/.local/share/DataBase
     dbDir := filepath.Join(usr.HomeDir, ".local", "share", "DataBase")
     mdb.dbPath = filepath.Join(dbDir, "MusicDataBase.db")
 
-    // Verificar si el directorio para la base de datos existe, si no, crearlo
+    // Verificar si el directorio de la base de datos existe, si no, se crea
     if _, err := os.Stat(dbDir); os.IsNotExist(err) {
         err := os.MkdirAll(dbDir, os.ModePerm)
         if err != nil {
@@ -39,19 +42,19 @@ func (mdb *MusicDataBase) InitializeDatabase() error {
         fmt.Printf("Directorio creado en: %s\n", dbDir)
     }
 
-    // Verificar si la base de datos existe, si no, crearla
+    // Verificar si el archivo de la base de datos existe, si no, se crea
     if _, err := os.Stat(mdb.dbPath); os.IsNotExist(err) {
         fmt.Printf("La base de datos no existe, se creará una nueva en: %s\n", mdb.dbPath)
     }
 
-    // Abrir la base de datos
+    // Abrir la conexión a la base de datos
     db, err := sql.Open("sqlite3", mdb.dbPath)
     if err != nil {
         return fmt.Errorf("error al abrir la base de datos: %s", err)
     }
     defer db.Close()
 
-    // Verificar si el esquema está completo
+    // Verificar si el esquema de la base de datos está completo
     if !completeSchemaExists(db) {
         fmt.Println("El esquema no está completo o no existe, se procederá a crear/acompletar el esquema...")
         createSchema(db)
@@ -60,10 +63,10 @@ func (mdb *MusicDataBase) InitializeDatabase() error {
         fmt.Println("El esquema ya está completo.")
     }
 
-    return nil 
+    return nil
 }
 
-// Función para verificar si el esquema de la base de datos está completo
+// completeSchemaExists verifica si todas las tablas necesarias existen en la base de datos.
 func completeSchemaExists(db *sql.DB) bool {
     requiredTables := []string{"types", "performers", "persons", "groups", "in_group", "albums", "rolas"}
 
@@ -75,7 +78,7 @@ func completeSchemaExists(db *sql.DB) bool {
     return true
 }
 
-// Función para verificar si una tabla específica existe en la base de datos
+// tableExists verifica si una tabla específica existe en la base de datos.
 func tableExists(db *sql.DB, tableName string) bool {
     var name string
     query := `SELECT name FROM sqlite_master WHERE type='table' AND name=?;`
@@ -89,7 +92,7 @@ func tableExists(db *sql.DB, tableName string) bool {
     return name == tableName
 }
 
-// Función para crear el esquema de la base de datos
+// createSchema crea las tablas necesarias para la base de datos si no existen.
 func createSchema(db *sql.DB) {
     schema := `
         CREATE TABLE types (
@@ -150,6 +153,8 @@ func createSchema(db *sql.DB) {
             FOREIGN KEY   (id_album) REFERENCES albums(id_album)
         );
     `
+
+    // Ejecutar el esquema para crear las tablas necesarias
     _, err := db.Exec(schema)
     if err != nil {
         log.Fatalf("Error al crear el esquema: %s\n", err)
