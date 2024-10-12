@@ -4,6 +4,9 @@
 ### Descripcion
 Este repositorio es un gestor de Música en donde podras visualizar la música que tenga el usuario en una interfaz grafica (fyne) donde te proporcionara la información de cada cancion en dicha interfaz.
 
+### Warning 
+Es necesario que le usuario primero especifique la ruta de sus canciones, antes de minar.
+
 ### Requisitos
 Es necesario que el usuario tenga instalado `Go` `(Golang)` en su maquina, exactamente la version `1.23.1`, para esto puedes descargarlo directamente de su pagina oficial la cual es:  
 `https://go.dev/dl/`  
