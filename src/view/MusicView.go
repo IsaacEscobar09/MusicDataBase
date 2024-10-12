@@ -10,6 +10,16 @@ import (
     "github.com/IsaacEscobar09/MusicDataBase/src/controller"
 )
 
+const maxCharLength = 30 // Cambia esto al número máximo de caracteres que desees mostrar
+
+// Función para truncar texto
+func truncateText(text string, maxLength int) string {
+    if len(text) > maxLength {
+        return text[:maxLength] + "..." // Agregar "..." si el texto se trunca
+    }
+    return text
+}
+
 func NewMusicView() {
     myApp := app.New()
     myWindow := myApp.NewWindow("Music Data Base")
@@ -26,20 +36,89 @@ func NewMusicView() {
     // Barra de progreso
     progressBar := widget.NewProgressBar()
 
-    // Crear el contenedor desplazable para las canciones
-    scrollableSongs := container.NewVScroll(container.NewVBox()) // Inicializar el contenedor de canciones vacío
-    scrollableSongs.SetMinSize(fyne.NewSize(800, 400)) // Define el tamaño mínimo del área desplazable
+    // Variables para los datos de la tabla
+    var songData [][]string
+    var songDataWithHeader [][]string
+
+    // Crear una tabla para mostrar los resultados de las canciones
+    songTable := widget.NewTable(
+        func() (int, int) {
+            return len(songDataWithHeader), 3 // Número de filas y 3 columnas
+        },
+        func() fyne.CanvasObject {
+            return widget.NewLabel("")
+        },
+        func(id widget.TableCellID, cell fyne.CanvasObject) {
+            label := cell.(*widget.Label)
+            if id.Row == 0 {
+                // Encabezados de columna
+                label.SetText(songDataWithHeader[0][id.Col])
+                label.TextStyle = fyne.TextStyle{Bold: true}
+            } else {
+                // Datos de las canciones, aplicando truncamiento
+                label.SetText(truncateText(songDataWithHeader[id.Row][id.Col], maxCharLength))
+                label.TextStyle = fyne.TextStyle{}
+            }
+        },
+    )
+    songTable.SetColumnWidth(0, 600) // Ancho de la columna Canción
+    songTable.SetColumnWidth(1, 600) // Ancho de la columna Performer
+    songTable.SetColumnWidth(2, 600) // Ancho de la columna Álbum
+
+    // Función para cargar los datos de la tabla
+    loadTableData := func() {
+        data, err := mc.CreateSongTableData()
+        if err != nil {
+            dialog.ShowError(err, myWindow)
+            return
+        }
+        songData = data
+
+        // Añadir encabezados
+        songDataWithHeader = [][]string{{"Canción", "Performer", "Álbum"}}
+        songDataWithHeader = append(songDataWithHeader, songData...)
+
+        songTable.Refresh()
+    }
+
+    // Cargar los datos al inicio
+    loadTableData()
 
     // Componentes de la UI
     searchEntry := widget.NewEntry()
-    searchEntry.SetPlaceHolder("Buscar canción")
+    searchEntry.SetPlaceHolder("Buscar canción:     performer: <nombre>, album: <album>, cancion: <cancion>, genero: <genero>, año: <año>")
 
-    // Función para realizar la búsqueda y actualizar la lista
+    // Función para realizar la búsqueda y actualizar la tabla
     performSearch := func() {
-        searchString := searchEntry.Text // Capturamos el texto ingresado por el usuario
-        songContainers := mc.CreateSearchResultsContainers(searchString) // Llamamos al método de búsqueda
-        scrollableSongs.Content = container.NewVBox(songContainers...) // Actualizamos el contenido
-        scrollableSongs.Refresh() // Refrescamos la vista para mostrar los nuevos resultados
+        searchString := searchEntry.Text
+        data, err := mc.SearchSongsTableData(searchString)
+        if err != nil {
+            dialog.ShowError(err, myWindow)
+            return
+        }
+        songData = data
+
+        // Añadir encabezados
+        songDataWithHeader = [][]string{{"Canción", "Performer", "Álbum"}}
+        songDataWithHeader = append(songDataWithHeader, songData...)
+
+        songTable.Refresh()
+    }
+
+    searchEntry.OnSubmitted = func(text string) {
+        performSearch() // Ejecuta la búsqueda cuando el usuario presiona Enter
+    }
+
+    // Manejar clics en las filas de la tabla
+    songTable.OnSelected = func(id widget.TableCellID) {
+        if id.Row > 0 { // Ignorar el encabezado
+            infoWindow := myApp.NewWindow("Información de la Canción")
+            infoLabel := widget.NewLabel("Información de la canción en proceso")
+            infoContainer := container.NewVBox(infoLabel)
+            infoWindow.SetContent(infoContainer)
+            infoWindow.Resize(fyne.NewSize(300, 200))
+            infoWindow.Show()
+        }
     }
 
     // Botones de la UI
@@ -61,19 +140,14 @@ func NewMusicView() {
 
     // Botón "Inicio" para restablecer la vista de todas las canciones
     homeButton := widget.NewButton("Inicio", func() {
-        songContainers := mc.CreateSongContainers()
-        scrollableSongs.Content = container.NewVBox(songContainers...)
-        scrollableSongs.Refresh()
+        loadTableData()
     })
 
-    // Inicialmente cargar todas las canciones de la base de datos
-    songContainers := mc.CreateSongContainers()
-    scrollableSongs.Content = container.NewVBox(songContainers...)
-
+    // Crear los botones en un contenedor horizontal
     buttonsContainer := container.NewHBox(
         helpButton,
         settingsButton,
-        homeButton, // Agregamos el botón "Inicio" al contenedor de botones
+        homeButton,
         layout.NewSpacer(),
         minimizeButton,
         fullscreenButton,
@@ -84,25 +158,20 @@ func NewMusicView() {
     minerButton := widget.NewButton("Miner", func() {
         // Llamar a la minería con barra de progreso y callback para refrescar las canciones
         mc.StartMiningWithProgress(myWindow, progressBar, func() {
-            songContainers := mc.CreateSongContainers()
-            scrollableSongs.Content = container.NewVBox(songContainers...)
-            scrollableSongs.Refresh()
+            loadTableData()
         })
     })
 
-    // Acción al presionar la tecla "Enter" en la barra de búsqueda
-    searchEntry.OnSubmitted = func(text string) {
-        performSearch() // Ejecuta la búsqueda cuando el usuario presiona Enter
-    }
-
-    // Definir el contenido principal, usando un spacer para empujar la lista de canciones
-    myWindow.SetContent(container.NewBorder(
+    // Definir el contenido principal
+    content := container.NewBorder(
         container.NewVBox(buttonsContainer, searchEntry, progressBar, minerButton), // Parte superior
-        nil,    // Parte inferior vacía
-        nil,    // Izquierda vacía
-        nil,    // Derecha vacía
-        scrollableSongs,  // Centro: lista de canciones que ocupa el resto de la pantalla
-    ))
+        nil, // Parte inferior
+        nil, // Parte izquierda
+        nil, // Parte derecha
+        songTable, // Área principal con la tabla de canciones
+    )
+
+    myWindow.SetContent(content)
 
     myWindow.Resize(fyne.NewSize(800, 600))
     myWindow.ShowAndRun()
